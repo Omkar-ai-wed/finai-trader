@@ -1,0 +1,69 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+.venv/
+venv/
+env/
+*.egg-info/
+dist/
+build/
+.eggs/
+*.log
+
+# FastAPI / Uvicorn
+*.db
+*.sqlite3
+finai_trader.db
+
+# Environment variables
+.env
+*.env.local
+*.env.production
+
+# Node.js / Next.js
+node_modules/
+.next/
+.nuxt/
+out/
+dist/
+
+# npm
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# IDEs
+.vscode/settings.json
+.vscode/bin/
+.vscode/micromamba/
+.vscode/temp/
+.vscode/*.lck
+.idea/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+
+# ML models (large files)
+*.bin
+*.safetensors
+*.pt
+*.pth
+models/
+
+# Docker volumes
+postgres_data/
+
+# GCP
+*.json.key
+service-account.json
+
+# Zencoder / agents
+.zencoder/
+.zenflow/
+
+# OS
+Desktop.ini
