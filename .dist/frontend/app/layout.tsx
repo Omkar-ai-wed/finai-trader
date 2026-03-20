@@ -18,10 +18,12 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           rel="stylesheet"
         />
       </head>
-      <body className="bg-background text-white antialiased">
-        <div className="flex h-screen overflow-hidden">
-          <Sidebar />
-          <main className="flex-1 overflow-y-auto p-6">
+      <body className="bg-background text-white antialiased" style={{margin:0,padding:0}}>
+        <div style={{display:'flex',flexDirection:'row',minHeight:'100vh',width:'100%',overflow:'hidden'}}>
+          <div style={{width:'224px',flexShrink:0,position:'sticky',top:0,height:'100vh',overflowY:'auto'}}>
+            <Sidebar />
+          </div>
+          <main style={{flex:1,overflowY:'auto',minHeight:'100vh',minWidth:0}}>
             {children}
           </main>
         </div>

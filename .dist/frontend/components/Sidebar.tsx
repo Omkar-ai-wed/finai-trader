@@ -1,65 +1,60 @@
-"use client";
+'use client';
+import Link from 'next/link';
+import { usePathname } from 'next/navigation';
 
-import Link from "next/link";
-import { usePathname } from "next/navigation";
-
-const items = [
-  { href: "/",                     label: "Dashboard",          icon: "⬡" },
-  { href: "/trading-bot",          label: "Trading Bot",        icon: "📈" },
-  { href: "/sentiment",            label: "Sentiment Analysis", icon: "🧠" },
-  { href: "/defi-fraud",           label: "DeFi Fraud",         icon: "🔍" },
-  { href: "/blockchain-explorer",  label: "Blockchain",         icon: "⛓" },
-  { href: "/backtesting",          label: "Backtesting",        icon: "⏮" },
-  { href: "/settings",             label: "Settings",           icon: "⚙" },
+const NAV = [
+  { href: '/',                   icon: '⬡',  label: 'Dashboard'         },
+  { href: '/trading-bot',        icon: '📈', label: 'Trading Bot'        },
+  { href: '/sentiment',          icon: '🧠', label: 'Sentiment AI'       },
+  { href: '/defi-fraud',         icon: '🔍', label: 'DeFi Fraud'         },
+  { href: '/blockchain-explorer',icon: '⛓',  label: 'Blockchain'         },
+  { href: '/backtesting',        icon: '⚡', label: 'Backtesting'        },
+  { href: '/settings',           icon: '⚙', label: 'Settings'           },
 ];
 
 export default function Sidebar() {
-  const pathname = usePathname();
-
+  const path = usePathname();
   return (
-    <aside className="w-60 h-screen bg-black/90 border-r border-neonBlue/20 flex flex-col flex-shrink-0 sticky top-0">
+    <aside
+      className="sidebar-glass flex flex-col w-56 shrink-0 min-h-screen sticky top-0 z-40"
+      style={{ position: 'sticky', top: 0, height: '100vh' }}
+    >
       {/* Logo */}
-      <div className="px-5 py-5 border-b border-neonBlue/10">
-        <div className="flex items-center gap-2">
-          <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-neonBlue to-finGreen flex items-center justify-center text-black font-bold text-sm">
-            F
+      <div className="px-4 py-5 border-b border-white/[0.06]">
+        <div className="flex items-center gap-2.5">
+          <div
+            className="w-8 h-8 rounded-lg flex items-center justify-center text-base shrink-0"
+            style={{
+              background: 'linear-gradient(135deg,rgba(0,245,255,0.25),rgba(168,85,247,0.25))',
+              border: '1px solid rgba(0,245,255,0.3)',
+              boxShadow: '0 0 16px rgba(0,245,255,0.2)',
+            }}
+          >
+            🤖
           </div>
           <div>
-            <div className="text-sm font-bold text-white leading-tight">FinAI Trader</div>
-            <div className="text-[10px] text-neonBlue/60 font-mono">v2.0 · AI Powered</div>
+            <p className="text-sm font-800 text-gradient-cyan-violet leading-none font-bold">FinAI</p>
+            <p className="text-[0.6rem] text-white/30 leading-none mt-0.5 font-mono uppercase tracking-widest">Trader v2.0</p>
           </div>
         </div>
-      </div>
-
-      {/* Live status bar */}
-      <div className="px-4 py-2 border-b border-neonBlue/10">
-        <div className="flex items-center gap-2 text-[11px] text-gray-400">
-          <span className="pulse-dot" />
-          <span>Live Market Data</span>
+        {/* Status indicator */}
+        <div className="flex items-center gap-1.5 mt-3">
+          <span className="w-1.5 h-1.5 rounded-full bg-[#10ffd1] animate-pulse-dot" />
+          <span className="text-[0.6rem] font-mono text-[#10ffd1]/70 uppercase tracking-widest">Live Market Data</span>
         </div>
       </div>
 
-      {/* Nav items */}
-      <nav className="flex-1 px-3 pt-3 space-y-0.5 overflow-y-auto">
-        <div className="text-[10px] text-gray-600 uppercase font-semibold tracking-widest px-2 mb-2">
-          Navigation
-        </div>
-        {items.map((item) => {
-          const active = pathname === item.href;
+      {/* Navigation */}
+      <nav className="flex-1 px-2.5 py-3 flex flex-col gap-0.5 overflow-y-auto">
+        <p className="px-2 pb-1.5 text-[0.6rem] uppercase tracking-widest text-white/20 font-semibold">Navigation</p>
+        {NAV.map(({ href, icon, label }) => {
+          const active = path === href;
           return (
-            <Link
-              key={item.href}
-              href={item.href}
-              className={`flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-150 ${
-                active
-                  ? "bg-neonBlue/15 text-neonBlue glow-blue border border-neonBlue/20"
-                  : "text-gray-400 hover:bg-white/5 hover:text-gray-100"
-              }`}
-            >
-              <span className="text-base w-5 text-center">{item.icon}</span>
-              {item.label}
+            <Link key={href} href={href} className={`nav-item ${active ? 'active' : ''}`}>
+              <span className="text-base w-5 text-center shrink-0">{icon}</span>
+              <span className="text-[0.8125rem]">{label}</span>
               {active && (
-                <span className="ml-auto w-1.5 h-1.5 rounded-full bg-neonBlue" />
+                <span className="ml-auto w-1.5 h-1.5 rounded-full bg-[#00f5ff] animate-pulse-dot" />
               )}
             </Link>
           );
@@ -67,10 +62,8 @@ export default function Sidebar() {
       </nav>
 
       {/* Footer */}
-      <div className="px-4 py-3 border-t border-neonBlue/10">
-        <div className="text-[10px] text-gray-600 font-mono">
-          © 2025 FinAI Platform
-        </div>
+      <div className="px-3 py-3 border-t border-white/[0.06]">
+        <p className="text-[0.6rem] text-white/20 text-center font-mono">© 2025 FinAI Platform</p>
       </div>
     </aside>
   );

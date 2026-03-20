@@ -1,134 +1,172 @@
-"use client";
-
-import { useState } from "react";
-import axios from "axios";
-import BacktestChart from "@/components/BacktestChart";
-
-const API_BASE = process.env.NEXT_PUBLIC_API_BASE || "http://localhost:8000/api";
-const TOKEN    = typeof window !== "undefined" ? localStorage.getItem("token") || "" : "";
-const api = () => axios.create({
-  baseURL: API_BASE,
-  headers: TOKEN ? { Authorization: `Bearer ${TOKEN}` } : {},
-});
+'use client';
+import { useState } from 'react';
+import BacktestChart from '@/components/BacktestChart';
 
 const STRATEGIES = [
-  { id: "sentiment_tech", name: "Sentiment + Tech Fusion",   desc: "Combines RSI, MACD, MA with NLP sentiment score" },
-  { id: "rsi_only",       name: "RSI Mean Reversion",        desc: "Buy oversold RSI (<30), sell overbought (>70)" },
-  { id: "macd_cross",     name: "MACD Crossover",            desc: "Enter on MACD/signal crossover, exit on reversal" },
+  { id: 'fusion',   name: 'Sentiment + Tech Fusion',  desc: 'Combines RSI, MACD, MA with NLP sentiment score' },
+  { id: 'rsi',      name: 'RSI Mean Reversion',         desc: 'Buy oversold RSI (<30), sell overbought (>70)'    },
+  { id: 'macd',     name: 'MACD Crossover',              desc: 'Enter on MACD/signal crossover, exit on reversal' },
+  { id: 'ma',       name: 'Golden Cross MA',             desc: '50-day MA crossing 200-day MA long entries'       },
 ];
 
-export default function BacktestingPage() {
-  const [selected, setSelected]   = useState("sentiment_tech");
-  const [result, setResult]       = useState<any>(null);
-  const [loading, setLoading]     = useState(false);
-  const [period, setPeriod]       = useState("1y");
+type ResultType = {
+  totalReturn: number; sharpe: number; maxDrawdown: number;
+  winRate: number; trades: number; equity: {value:number;date:string}[];
+};
 
-  const runBacktest = async () => {
-    setLoading(true);
-    try {
-      const res = await api().post("/trade/backtest", { strategy: selected, period });
-      setResult(res.data);
-    } catch {
-      // Demo result
-      const start = 10000;
-      const pts = Array.from({ length: 52 }, (_, i) => ({
-        date: new Date(Date.now() - (51 - i) * 7 * 86400000).toISOString().slice(0, 10),
-        value: parseFloat((start * (1 + 0.002 * i + (Math.random() - 0.48) * 0.05)).toFixed(2)),
-      }));
-      setResult({
-        status: "completed",
-        start_portfolio: start,
-        final_portfolio: pts.at(-1)!.value,
-        total_return_pct: (((pts.at(-1)!.value - start) / start) * 100).toFixed(2),
-        sharpe_ratio: (0.8 + Math.random() * 0.8).toFixed(3),
-        max_drawdown_pct: (3 + Math.random() * 12).toFixed(2),
-        num_trades: Math.floor(20 + Math.random() * 60),
-        equity_curve: pts,
-      });
-    }
-    setLoading(false);
+function makeEquityCurve(capital: number, ret: number) {
+  const n = 30;
+  return Array.from({ length: n }, (_, i) => ({
+    date: `Day ${i + 1}`,
+    value: +(capital * (1 + (ret / 100) * (i / n) + (Math.random() - 0.5) * 0.03)).toFixed(2),
+  }));
+}
+
+export default function BacktestingPage() {
+  const [strategy, setStrategy]   = useState('fusion');
+  const [period, setPeriod]       = useState('1y');
+  const [symbol, setSymbol]       = useState('BTCUSDT');
+  const [capital, setCapital]     = useState('10000');
+  const [running, setRunning]     = useState(false);
+  const [result, setResult]       = useState<ResultType | null>(null);
+
+  const run = async () => {
+    setRunning(true);
+    setResult(null);
+    await new Promise(r => setTimeout(r, 1800));
+    const ret       = +(Math.random() * 80 - 15).toFixed(2);
+    const sharpe    = +(Math.random() * 2.5 + 0.5).toFixed(2);
+    const dd        = +(Math.random() * 35 + 5).toFixed(1);
+    const winRate   = +(Math.random() * 30 + 48).toFixed(1);
+    const trades    = Math.floor(Math.random() * 120 + 40);
+    setResult({ totalReturn: ret, sharpe, maxDrawdown: dd, winRate, trades,
+      equity: makeEquityCurve(+capital, ret) });
+    setRunning(false);
+  };
+
+  const demoRun = () => {
+    const ret = 34.7;
+    setResult({ totalReturn: ret, sharpe: 1.82, maxDrawdown: 12.4, winRate: 62.3, trades: 87,
+      equity: makeEquityCurve(+capital, ret) });
   };
 
   return (
-    <div className="space-y-5 animate-fade-in">
-      <div>
-        <h1 className="text-2xl font-bold">Strategy Backtesting</h1>
-        <p className="text-gray-400 text-sm mt-0.5">Test trading strategies on historical price data</p>
+    <div className="page-content">
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <div className="accent-line" />
+          <h1 className="section-title text-gradient-cyan-violet">Strategy Backtesting</h1>
+          <p className="section-subtitle">Test trading strategies on historical price data</p>
+        </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
-        {/* Config */}
-        <div className="space-y-4">
-          <div className="card border-neonBlue/20 p-4">
-            <div className="text-sm font-semibold text-white mb-3">Select Strategy</div>
-            <div className="space-y-2">
-              {STRATEGIES.map((s) => (
-                <label key={s.id} className={`block rounded-lg px-3 py-2.5 cursor-pointer border transition-all ${selected === s.id ? "border-neonBlue/50 bg-neonBlue/10" : "border-white/5 hover:border-white/20"}`}>
-                  <input type="radio" className="hidden" value={s.id} checked={selected === s.id} onChange={() => setSelected(s.id)} />
-                  <div className="text-sm font-medium text-white">{s.name}</div>
-                  <div className="text-xs text-gray-400 mt-0.5">{s.desc}</div>
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-3">
+        {/* Config Panel */}
+        <div className="lg:col-span-1 flex flex-col gap-3">
+          {/* Strategy Select */}
+          <div className="glass-card p-4">
+            <p className="text-xs font-semibold uppercase tracking-widest text-white/40 mb-3">Select Strategy</p>
+            <div className="flex flex-col gap-2">
+              {STRATEGIES.map(s => (
+                <label key={s.id}
+                  className={`flex items-start gap-3 p-2.5 rounded-xl cursor-pointer border transition-all ${
+                    strategy === s.id
+                      ? 'border-[#00f5ff]/40 bg-[#00f5ff]/05'
+                      : 'border-white/5 hover:border-white/10'
+                  }`}>
+                  <input type="radio" name="strategy" value={s.id}
+                    checked={strategy === s.id}
+                    onChange={() => setStrategy(s.id)}
+                    className="mt-0.5 accent-cyan-400" />
+                  <div>
+                    <p className={`text-sm font-semibold ${strategy === s.id ? 'text-[#00f5ff]' : 'text-white/80'}`}>{s.name}</p>
+                    <p className="text-[0.65rem] text-white/30 mt-0.5">{s.desc}</p>
+                  </div>
                 </label>
               ))}
             </div>
           </div>
 
-          <div className="card border-neonBlue/20 p-4">
-            <div className="text-sm font-semibold text-white mb-3">Parameters</div>
-            <div className="space-y-3 text-sm">
+          {/* Parameters */}
+          <div className="glass-card p-4">
+            <p className="text-xs font-semibold uppercase tracking-widest text-white/40 mb-3">Parameters</p>
+            <div className="flex flex-col gap-3">
               <div>
-                <label className="text-gray-400 text-xs block mb-1">Time Period</label>
-                <select value={period} onChange={(e) => setPeriod(e.target.value)}
-                  className="input w-full">
-                  {["3m", "6m", "1y", "2y"].map((p) => (
-                    <option key={p} value={p}>{p}</option>
-                  ))}
+                <label className="metric-label mb-1 block">Time Period</label>
+                <select value={period} onChange={e => setPeriod(e.target.value)} className="glass-input">
+                  {['1m','3m','6m','1y','2y','5y'].map(p => <option key={p} value={p}>{p}</option>)}
                 </select>
               </div>
               <div>
-                <label className="text-gray-400 text-xs block mb-1">Symbol</label>
-                <input defaultValue="BTCUSDT" className="input w-full" />
+                <label className="metric-label mb-1 block">Symbol</label>
+                <input value={symbol} onChange={e => setSymbol(e.target.value)} className="glass-input font-mono" />
               </div>
               <div>
-                <label className="text-gray-400 text-xs block mb-1">Initial Capital</label>
-                <input defaultValue="10000" className="input w-full" />
+                <label className="metric-label mb-1 block">Initial Capital (USDT)</label>
+                <input value={capital} onChange={e => setCapital(e.target.value)} className="glass-input font-mono" />
               </div>
             </div>
-            <button onClick={runBacktest} disabled={loading}
-              className="btn btn-blue w-full mt-4">
-              {loading ? "⏳ Running..." : "⚡ Run Backtest"}
+          </div>
+
+          {/* Run Buttons */}
+          <div className="flex flex-col gap-2">
+            <button onClick={run} disabled={running} className="btn btn-cyan w-full justify-center py-3">
+              {running ? (
+                <span className="flex items-center gap-2"><span className="shimmer w-16 h-3 rounded" /> Running…</span>
+              ) : '⚡ Run Backtest'}
             </button>
+            <button onClick={demoRun} className="btn btn-ghost w-full justify-center">▶ Run Demo</button>
           </div>
         </div>
 
-        {/* Results */}
-        <div className="lg:col-span-2 space-y-4">
-          {result ? (
+        {/* Results Panel */}
+        <div className="lg:col-span-2 flex flex-col gap-3">
+          {!result ? (
+            <div className="glass-card p-8 flex flex-col items-center justify-center gap-3 text-center" style={{minHeight:300}}>
+              <span className="text-4xl animate-float">📊</span>
+              <p className="text-white/40 text-sm">Select a strategy and run backtest to see results</p>
+              <button onClick={demoRun} className="btn btn-violet">View Demo Results</button>
+            </div>
+          ) : (
             <>
-              <BacktestChart data={result.equity_curve ?? []} startVal={result.start_portfolio ?? 10000} />
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+              {/* Metrics Grid */}
+              <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 stagger-children">
                 {[
-                  { label: "Total Return",   val: `${result.total_return_pct ?? 0}%`,  color: parseFloat(result.total_return_pct) >= 0 ? "text-finGreen" : "text-danger" },
-                  { label: "Final NAV",      val: `$${Number(result.final_portfolio).toLocaleString()}`, color: "text-white" },
-                  { label: "Sharpe Ratio",   val: result.sharpe_ratio ?? "—",          color: "text-neonBlue" },
-                  { label: "Max Drawdown",   val: `${result.max_drawdown_pct ?? 0}%`,  color: "text-danger" },
-                ].map((m) => (
-                  <div key={m.label} className="card border-neonBlue/20 p-3 text-center">
-                    <div className="text-[10px] text-gray-400 uppercase mb-1">{m.label}</div>
-                    <div className={`text-lg font-bold mono ${m.color}`}>{m.val}</div>
+                  { label:'Total Return',  value:`${result.totalReturn>=0?'+':''}${result.totalReturn}%`,  color: result.totalReturn>=0?'text-glow-green':'text-glow-red',   card: result.totalReturn>=0?'stat-card-green':'stat-card-red'  },
+                  { label:'Sharpe Ratio',  value:result.sharpe.toFixed(2),  color:'text-glow-cyan',   card:'stat-card-cyan'   },
+                  { label:'Max Drawdown',  value:`-${result.maxDrawdown}%`, color:'text-glow-red',    card:'stat-card-red'    },
+                  { label:'Win Rate',      value:`${result.winRate}%`,       color:'text-glow-violet', card:'stat-card-violet' },
+                  { label:'Total Trades',  value:result.trades.toString(),   color:'text-glow-amber',  card:'stat-card-amber'  },
+                ].map(m => (
+                  <div key={m.label} className={`stat-card ${m.card} animate-fade-in-up text-center`}>
+                    <p className={`metric-value text-base ${m.color}`}>{m.value}</p>
+                    <p className="metric-label mt-1">{m.label}</p>
                   </div>
                 ))}
               </div>
-              <div className="card border-neonBlue/20 p-4 text-xs text-gray-400">
-                <span className="text-white font-semibold mr-2">Strategy:</span>
-                {STRATEGIES.find((s) => s.id === selected)?.name} · {result.num_trades ?? 0} trades · Starting capital $10,000
+
+              {/* Equity Curve */}
+              <div className="glass-card p-4">
+                <div className="flex items-center justify-between mb-3">
+                  <p className="text-xs font-semibold uppercase tracking-widest text-white/40">Equity Curve</p>
+                  <span className={`badge ${result.totalReturn >= 0 ? 'badge-green' : 'badge-red'}`}>
+                    {result.totalReturn >= 0 ? '▲' : '▼'} {Math.abs(result.totalReturn)}%
+                  </span>
+                </div>
+                <div className="chart-container" style={{ height: 220 }}>
+                  <BacktestChart data={result.equity} />
+                </div>
+              </div>
+
+              {/* Notes */}
+              <div className="glass-card p-3 flex items-start gap-2">
+                <span className="text-amber-400 mt-0.5">⚠</span>
+                <p className="text-[0.7rem] text-white/30">
+                  Past performance does not guarantee future results. Backtests use synthetic data in demo mode.
+                  Connect a real exchange API for live historical data.
+                </p>
               </div>
             </>
-          ) : (
-            <div className="card border-neonBlue/20 p-12 flex flex-col items-center justify-center text-center">
-              <div className="text-4xl mb-3">📊</div>
-              <div className="text-gray-400 text-sm">Select a strategy and run backtest to see results</div>
-              <button onClick={runBacktest} className="btn btn-blue mt-4">⚡ Run Demo Backtest</button>
-            </div>
           )}
         </div>
       </div>

@@ -11,16 +11,13 @@ type Trade = {
   symbol?: string;
 };
 
-type Props = { trades: Trade[] };
+type Props = { trades?: Trade[] };
 
-export default function TradeHistoryTable({ trades }: Props) {
+export default function TradeHistoryTable({ trades = [] }: Props) {
   if (!trades.length) {
     return (
-      <div className="card border-neonBlue/20 p-4">
-        <div className="text-sm font-semibold text-white mb-3">Trade History</div>
-        <div className="text-center text-gray-500 text-sm py-6">
-          No trades yet. Start the bot to see live trades.
-        </div>
+      <div className="text-center text-white/25 text-sm py-8">
+        No trades yet — start the bot to see live trades.
       </div>
     );
   }

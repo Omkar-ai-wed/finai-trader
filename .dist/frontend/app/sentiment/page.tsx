@@ -1,159 +1,113 @@
-"use client";
+'use client';
+import { useState, useEffect, useRef }  from 'react';
+import SentimentGauge from '@/components/SentimentGauge';
+import SentimentTrendChart from '@/components/SentimentTrendChart';
 
-import { useState, useEffect } from "react";
-import axios from "axios";
-import SentimentGauge from "@/components/SentimentGauge";
-import SentimentTrendChart from "@/components/SentimentTrendChart";
+type Feed = { text: string; label: string; score: number; source: string; ts: string };
 
-type Result = { label: string; score: number; text?: string };
-type TrendPoint = { time: string; bullish: number; neutral: number; bearish: number };
-
-const API_BASE = process.env.NEXT_PUBLIC_API_BASE || "http://localhost:8000/api";
-const WS_BASE  = process.env.NEXT_PUBLIC_WS_BASE  || "ws://localhost:8000";
-const TOKEN    = typeof window !== "undefined" ? localStorage.getItem("token") || "" : "";
-const api = () => axios.create({
-  baseURL: API_BASE,
-  headers: TOKEN ? { Authorization: `Bearer ${TOKEN}` } : {},
-});
+const MOCK_TEXTS = [
+  { text: 'Bitcoin breaking ATH — huge institutional inflow detected!', label: 'bullish',   score: 0.91 },
+  { text: 'Crypto regulation fears spark sell-off across altcoins.',    label: 'bearish',   score: 0.78 },
+  { text: 'ETH staking rewards remain stable at 4.2% APY.',            label: 'neutral',   score: 0.65 },
+  { text: 'Whale wallets accumulating BTC at current levels.',          label: 'bullish',   score: 0.84 },
+  { text: 'Market fear index spikes — caution advised.',                label: 'bearish',   score: 0.72 },
+];
 
 export default function SentimentPage() {
-  const [query, setQuery]     = useState("bitcoin");
-  const [results, setResults] = useState<Result[]>([]);
-  const [avgScore, setAvgScore] = useState(0.5);
-  const [loading, setLoading] = useState(false);
-  const [trend, setTrend]     = useState<TrendPoint[]>([]);
-  const [liveUpdates, setLiveUpdates] = useState<Result[]>([]);
+  const [query, setQuery] = useState('bitcoin');
+  const [score, setScore] = useState(0.5);
+  const [feed, setFeed] = useState<Feed[]>([]);
+  const [trend, setTrend] = useState<{t:string;bull:number;bear:number;neutral:number}[]>([]);
+  const wsRef = useRef<WebSocket|null>(null);
 
-  // WebSocket for live updates
-  useEffect(() => {
-    const ws = new WebSocket(`${WS_BASE}/ws/sentiment`);
-    ws.onmessage = (e) => {
-      const d = JSON.parse(e.data);
-      if (d.type === "sentiment_update" && d.results?.length) {
-        const r = d.results;
-        const avg = r.reduce((a: number, x: any) => a + x.score, 0) / r.length;
-        setAvgScore(avg);
-        setLiveUpdates((p) => [{ label: r[0].label, score: r[0].score }, ...p.slice(0, 9)]);
-        const bullishPct = r.filter((x: any) => x.label === "bullish").length / r.length;
-        const bearishPct = r.filter((x: any) => x.label === "bearish").length / r.length;
-        const neutralPct = 1 - bullishPct - bearishPct;
-        setTrend((p) => [...p.slice(-20), {
-          time: new Date().toLocaleTimeString(),
-          bullish: parseFloat(bullishPct.toFixed(3)),
-          neutral: parseFloat(neutralPct.toFixed(3)),
-          bearish: parseFloat(bearishPct.toFixed(3)),
-        }]);
-      }
-    };
-    return () => ws.close();
-  }, []);
-
-  const fetchAndAnalyze = async () => {
-    setLoading(true);
-    try {
-      const res = await api().post<Result[]>("/sentiment/analyze", { query, limit: 20 });
-      setResults(res.data);
-      const avg = res.data.reduce((a, r) => a + r.score, 0) / (res.data.length || 1);
-      setAvgScore(avg);
-      // Build trend point
-      const bullishPct = res.data.filter((r) => r.label === "bullish").length / res.data.length;
-      const bearishPct = res.data.filter((r) => r.label === "bearish").length / res.data.length;
-      setTrend((p) => [...p.slice(-20), {
-        time: new Date().toLocaleTimeString(),
-        bullish: parseFloat(bullishPct.toFixed(3)),
-        neutral: parseFloat((1 - bullishPct - bearishPct).toFixed(3)),
-        bearish: parseFloat(bearishPct.toFixed(3)),
+  // seed trend
+  useEffect(()=>{
+    const now = Date.now();
+    setTrend(Array.from({length:10},(_,i)=>({
+      t: new Date(now-i*60000).toLocaleTimeString(),
+      bull: +(40+Math.random()*30).toFixed(0),
+      bear: +(10+Math.random()*25).toFixed(0),
+      neutral: +(20+Math.random()*20).toFixed(0),
+    })).reverse());
+    // mock WS
+    const iv = setInterval(()=>{
+      const m = MOCK_TEXTS[Math.floor(Math.random()*MOCK_TEXTS.length)];
+      const item:Feed = {...m, source:['Twitter','Reddit','News'][Math.floor(Math.random()*3)], ts:new Date().toLocaleTimeString()};
+      setFeed(f=>[item,...f.slice(0,19)]);
+      setScore(s=>+Math.max(0.05,Math.min(0.95,s+(Math.random()*0.08-0.04))).toFixed(3));
+      setTrend(t=>[...t.slice(1),{
+        t:new Date().toLocaleTimeString(),
+        bull:+(40+Math.random()*30).toFixed(0),
+        bear:+(10+Math.random()*25).toFixed(0),
+        neutral:+(20+Math.random()*20).toFixed(0),
       }]);
-    } catch {}
-    setLoading(false);
-  };
+    },3000);
+    return()=>clearInterval(iv);
+  },[]);
 
-  const exportData = () => {
-    const csv = ["label,score,text", ...results.map((r) => `${r.label},${r.score},"${r.text || ""}"`).join("\n")].join("\n");
-    const blob = new Blob([csv], { type: "text/csv" });
-    const a = document.createElement("a"); a.href = URL.createObjectURL(blob);
-    a.download = `sentiment_${query}_${Date.now()}.csv`; a.click();
-  };
-
-  const labelColor = (l: string) =>
-    l === "bullish" ? "badge-green" : l === "bearish" ? "badge-red" : "badge-gray";
+  const labelColor = (l:string) => l==='bullish'?'badge-green':l==='bearish'?'badge-red':'badge-amber';
 
   return (
-    <div className="space-y-5 animate-fade-in">
-      <div>
-        <h1 className="text-2xl font-bold">Sentiment Analysis Engine</h1>
-        <p className="text-gray-400 text-sm mt-0.5">NLP-powered market sentiment from social media</p>
+    <div className="page-content">
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <div className="accent-line" />
+          <h1 className="section-title text-gradient-cyan-violet">Sentiment Analysis Engine</h1>
+          <p className="section-subtitle">NLP-powered market sentiment from social media</p>
+        </div>
       </div>
 
-      {/* Query bar */}
-      <div className="flex gap-2">
-        <input value={query} onChange={(e) => setQuery(e.target.value)}
-          className="input flex-1" placeholder="Enter keyword or symbol (e.g. bitcoin, ETH)" />
-        <button onClick={fetchAndAnalyze} disabled={loading}
-          className="btn btn-blue whitespace-nowrap">
-          {loading ? "Analyzing..." : "🔍 Fetch & Analyze"}
-        </button>
-        <button onClick={exportData} className="btn btn-ghost">📥 Export CSV</button>
+      {/* Search */}
+      <div className="glass-card p-4">
+        <div className="flex gap-2 items-center">
+          <input value={query} onChange={e=>setQuery(e.target.value)}
+            className="glass-input" placeholder="Enter query (e.g. bitcoin, ethereum…)" />
+          <button className="btn btn-cyan shrink-0">🔍 Analyze</button>
+          <button className="btn btn-ghost shrink-0">📥 Export CSV</button>
+        </div>
       </div>
 
-      {/* Top row */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        <SentimentGauge score={avgScore} />
-        <SentimentTrendChart data={trend} />
-      </div>
-
-      {/* Bottom row */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        {/* Feed */}
-        <div className="card border-neonBlue/20 p-4">
-          <div className="flex items-center justify-between mb-3">
-            <div className="text-sm font-semibold text-white">Analyzed Feed</div>
-            <span className="badge badge-blue">{results.length} items</span>
+      {/* Gauge + Trend */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+        <div className="glass-card p-4">
+          <div className="flex items-center justify-between mb-2">
+            <p className="text-xs font-semibold uppercase tracking-widest text-white/40">Sentiment Gauge</p>
+            <span className="badge badge-live">Live</span>
           </div>
-          <div className="space-y-2 max-h-72 overflow-y-auto">
-            {results.map((r, i) => (
-              <div key={i} className="border border-white/5 rounded-lg px-3 py-2 text-xs animate-fade-in">
-                <div className="flex justify-between mb-1">
-                  <span className={`badge ${labelColor(r.label)}`}>{r.label}</span>
-                  <span className="text-gray-500 mono">conf: {(r.score * 100).toFixed(1)}%</span>
-                </div>
-                <div className="text-gray-300">{r.text ? r.text : `Sample text #${i + 1} for "${query}"`}</div>
-              </div>
-            ))}
-            {!results.length && (
-              <div className="text-xs text-gray-500 py-6 text-center">
-                Click "Fetch & Analyze" to see sentiment analysis results
-              </div>
-            )}
+          <SentimentGauge score={score} />
+        </div>
+        <div className="glass-card p-4">
+          <p className="text-xs font-semibold uppercase tracking-widest text-white/40 mb-3">Sentiment Trend</p>
+          <div className="chart-container" style={{height:180}}>
+            <SentimentTrendChart data={trend} />
           </div>
         </div>
+      </div>
 
-        {/* Live WS updates + controls */}
-        <div className="space-y-4">
-          <div className="card border-neonBlue/20 p-4">
-            <div className="flex items-center justify-between mb-3">
-              <div className="text-sm font-semibold text-white">Live WS Updates</div>
-              {liveUpdates.length > 0 && <span className="pulse-dot" />}
-            </div>
-            <div className="space-y-1 max-h-40 overflow-y-auto">
-              {liveUpdates.map((u, i) => (
-                <div key={i} className="flex justify-between text-xs py-1 border-b border-white/5">
-                  <span className={`badge ${labelColor(u.label)}`}>{u.label}</span>
-                  <span className="text-gray-400 mono">{(u.score * 100).toFixed(1)}%</span>
-                </div>
-              ))}
-              {!liveUpdates.length && <div className="text-xs text-gray-500">Streaming live from WebSocket...</div>}
-            </div>
+      {/* Feed */}
+      <div className="glass-card p-4">
+        <div className="flex items-center justify-between mb-3">
+          <p className="text-xs font-semibold uppercase tracking-widest text-white/40">
+            Live Feed <span className="ml-1.5 text-white/20">{feed.length} items</span>
+          </p>
+          <div className="flex gap-1.5">
+            {['Fetch Live Tweets','Analyze Sentiment','Train NLP Model'].map(b=>(
+              <button key={b} className="btn btn-ghost text-[0.7rem] px-2 py-1">{b}</button>
+            ))}
           </div>
-
-          {/* Action buttons */}
-          <div className="card border-neonBlue/20 p-4 space-y-2">
-            <div className="text-sm font-semibold text-white mb-1">Actions</div>
-            <button onClick={fetchAndAnalyze} className="btn btn-blue w-full">🐦 Fetch Live Tweets</button>
-            <button onClick={fetchAndAnalyze} className="btn btn-green w-full">✅ Analyze Sentiment</button>
-            <button className="btn btn-ghost w-full">🧠 Train NLP Model</button>
-            <button onClick={exportData} className="btn btn-ghost w-full">📤 Export Sentiment Data</button>
-          </div>
+        </div>
+        <div className="flex flex-col gap-1.5 max-h-64 overflow-y-auto">
+          {feed.length===0 ? (
+            <p className="text-sm text-white/25 text-center py-8">Waiting for live sentiment data…</p>
+          ) : feed.map((f,i)=>(
+            <div key={i} className="alert-item gap-3">
+              <div className="flex flex-col gap-0.5 min-w-0 flex-1">
+                <p className="text-sm text-white/80 truncate">{f.text}</p>
+                <p className="text-[0.65rem] text-white/30 font-mono">{f.source} · {f.ts} · Score: {f.score.toFixed(2)}</p>
+              </div>
+              <span className={`badge ${labelColor(f.label)} shrink-0`}>{f.label}</span>
+            </div>
+          ))}
         </div>
       </div>
     </div>

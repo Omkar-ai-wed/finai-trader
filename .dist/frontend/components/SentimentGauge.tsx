@@ -1,82 +1,56 @@
-"use client";
-
-import {
-  RadialBarChart,
-  RadialBar,
-  Cell,
-  ResponsiveContainer,
-} from "recharts";
+'use client';
+import { RadialBarChart, RadialBar, Cell, ResponsiveContainer } from 'recharts';
 
 type Props = { score: number }; // 0..1
 
-const LABELS = ["Extreme Bear", "Bearish", "Neutral", "Bullish", "Extreme Bull"];
-const COLORS = ["#ff4444", "#ff7a44", "#8b8b8b", "#44c8ff", "#00ff7f"];
+const BANDS = [
+  { label: 'Extreme Bear', min: 0,    color: '#ff3d6e' },
+  { label: 'Bearish',      min: 0.2,  color: '#f97316' },
+  { label: 'Neutral',      min: 0.4,  color: '#6b7280' },
+  { label: 'Bullish',      min: 0.6,  color: '#00f5ff' },
+  { label: 'Extreme Bull', min: 0.8,  color: '#10ffd1' },
+];
 
-function getSentimentLabel(score: number) {
-  if (score < 0.2) return { label: "Extreme Bear", color: "#ff4444" };
-  if (score < 0.4) return { label: "Bearish",      color: "#ff7a44" };
-  if (score < 0.6) return { label: "Neutral",      color: "#8b8b8b" };
-  if (score < 0.8) return { label: "Bullish",      color: "#44c8ff" };
-  return              { label: "Extreme Bull",  color: "#00ff7f" };
+function getInfo(score: number) {
+  return [...BANDS].reverse().find(b => score >= b.min) ?? BANDS[0];
 }
 
 export default function SentimentGauge({ score }: Props) {
-  const pct = Math.round(score * 100);
-  const { label, color } = getSentimentLabel(score);
-
-  const data = [
-    { name: "score", value: pct },
-    { name: "empty", value: 100 - pct },
-  ];
+  const pct       = Math.round(score * 100);
+  const { label, color } = getInfo(score);
+  const data = [{ value: pct }, { value: 100 - pct }];
 
   return (
-    <div className="card border-neonBlue/20 p-4">
-      <div className="text-sm font-semibold text-white mb-2">Sentiment Gauge</div>
-      <div className="flex items-center gap-4">
-        {/* Arc chart */}
-        <div style={{ width: 120, height: 120 }} className="flex-shrink-0">
-          <ResponsiveContainer width="100%" height="100%">
-            <RadialBarChart
-              cx="50%"
-              cy="60%"
-              innerRadius="65%"
-              outerRadius="100%"
-              startAngle={180}
-              endAngle={0}
-              data={data}
-            >
-              <RadialBar dataKey="value" cornerRadius={4}>
-                <Cell key="score" fill={color} />
-                <Cell key="empty" fill="rgba(255,255,255,0.05)" />
-              </RadialBar>
-            </RadialBarChart>
-          </ResponsiveContainer>
-        </div>
-        {/* Labels */}
-        <div>
-          <div className="text-3xl font-bold mono" style={{ color }}>{pct}%</div>
-          <div className="text-sm font-medium mt-0.5" style={{ color }}>{label}</div>
-          <div className="text-[11px] text-gray-500 mt-2">
-            0 = Full Bearish · 100 = Full Bullish
-          </div>
+    <div style={{ display: 'flex', alignItems: 'center', gap: '1.5rem', padding: '0.5rem 0' }}>
+      {/* Radial Arc */}
+      <div style={{ width: 130, height: 130, flexShrink: 0 }}>
+        <ResponsiveContainer width="100%" height="100%">
+          <RadialBarChart cx="50%" cy="68%" innerRadius="60%" outerRadius="100%"
+            startAngle={180} endAngle={0} data={data}>
+            <RadialBar dataKey="value" cornerRadius={6} background={{ fill: 'rgba(255,255,255,0.04)' }}>
+              <Cell fill={color} style={{ filter: `drop-shadow(0 0 8px ${color}80)` }} />
+              <Cell fill="transparent" />
+            </RadialBar>
+          </RadialBarChart>
+        </ResponsiveContainer>
+      </div>
 
-          {/* Mini legend */}
-          <div className="flex gap-1 mt-3 flex-wrap">
-            {LABELS.map((l, i) => (
-              <span
-                key={l}
-                className="text-[9px] px-1.5 py-0.5 rounded-full"
-                style={{
-                  background: COLORS[i] + "22",
-                  color: COLORS[i],
-                  border: `1px solid ${COLORS[i]}44`,
-                  fontWeight: l === label ? 700 : 400,
-                }}
-              >
-                {l}
-              </span>
-            ))}
-          </div>
+      {/* Right side info */}
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <p style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: '2rem', fontWeight: 800, color, lineHeight: 1,
+          textShadow: `0 0 16px ${color}90` }}>{pct}%</p>
+        <p style={{ fontSize: 13, fontWeight: 600, color, marginTop: 4 }}>{label}</p>
+        <p style={{ fontSize: 10, color: 'rgba(255,255,255,0.25)', marginTop: 8, lineHeight: 1.5 }}>
+          0 = Full Bearish · 100 = Full Bullish
+        </p>
+        {/* Band pills */}
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginTop: 10 }}>
+          {BANDS.map(b => (
+            <span key={b.label} style={{
+              fontSize: 9, padding: '2px 7px', borderRadius: 9999, fontWeight: b.label === label ? 700 : 400,
+              background: b.color + '18', color: b.color, border: `1px solid ${b.color}${b.label === label ? '55' : '25'}`,
+            }}>{b.label}</span>
+          ))}
         </div>
       </div>
     </div>
